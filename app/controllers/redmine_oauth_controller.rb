@@ -142,21 +142,21 @@ class RedmineOauthController < AccountController
                                                                                    redirect_uri: oauth_callback_url,
                                                                                    code_verifier: code_verifier)
       id_token = token.params['id_token']
-      user_info = JWT.decode(id_token, nil, false).first
+      user_info = JWT.decode(id_token, nil, false).first.flatten_data
       email = user_info['email']
     when 'GitHub'
       token = RedmineOauth::OauthClient.client(oauth_provider).auth_code.get_token(params['code'],
                                                                                    redirect_uri: oauth_callback_url,
                                                                                    code_verifier: code_verifier)
       userinfo_response = token.get('https://api.github.com/user', headers: { 'Accept' => 'application/json' })
-      user_info = JSON.parse(userinfo_response.body)
+      user_info = JSON.parse(userinfo_response.body).flatten_data
       email = user_info['email']
     when 'GitLab'
       token = RedmineOauth::OauthClient.client(oauth_provider).auth_code.get_token(params['code'],
                                                                                    redirect_uri: oauth_callback_url,
                                                                                    code_verifier: code_verifier)
       userinfo_response = token.get('/api/v4/user', headers: { 'Accept' => 'application/json' })
-      user_info = JSON.parse(userinfo_response.body)
+      user_info = JSON.parse(userinfo_response.body).flatten_data
       user_info['login'] = user_info['username']
       if oauth_provider.url_parameters =~ /hd=([^&]*)/
         hd = Regexp.last_match(1)
@@ -172,7 +172,7 @@ class RedmineOauthController < AccountController
                                                                                    code_verifier: code_verifier)
       userinfo_response = token.get('https://openidconnect.googleapis.com/v1/userinfo',
                                     headers: { 'Accept' => 'application/json' })
-      user_info = JSON.parse(userinfo_response.body)
+      user_info = JSON.parse(userinfo_response.body).flatten_data
       user_info['login'] = user_info['email']
       if oauth_provider.url_parameters =~ /hd=([^&]*)/
         hd = Regexp.last_match(1)
@@ -186,7 +186,7 @@ class RedmineOauthController < AccountController
       token = RedmineOauth::OauthClient.client(oauth_provider).auth_code.get_token(params['code'],
                                                                                    redirect_uri: oauth_callback_url,
                                                                                    code_verifier: code_verifier)
-      user_info = JWT.decode(token.token, nil, false).first
+      user_info = JWT.decode(token.token, nil, false).first.flatten_data
       user_info['login'] = user_info['preferred_username']
       email = user_info['email']
       session[:oauth_id_token] = token.params[:id_token]
@@ -198,7 +198,7 @@ class RedmineOauthController < AccountController
         "/oauth2/#{oauth_provider.tenant_id}/v1/userinfo",
         headers: { 'Accept' => 'application/json' }
       )
-      user_info = JSON.parse(userinfo_response.body)
+      user_info = JSON.parse(userinfo_response.body).flatten_data
       user_info['login'] = user_info['preferred_username']
       email = user_info['email']
       session[:oauth_id_token] = token.params[:id_token]
@@ -207,14 +207,12 @@ class RedmineOauthController < AccountController
                                                                                    redirect_uri: oauth_callback_url,
                                                                                    code_verifier: code_verifier)
       if oauth_provider.custom_profile_endpoint.empty?
-        user_info = JWT.decode(token.token, nil, false).first
+        user_info = JWT.decode(token.token, nil, false).first.flatten_data
       else
         userinfo_response = token.get(
           oauth_provider.custom_profile_endpoint,
           headers: { 'Accept' => 'application/json' }
         )
-        # flatten_data converts a complex hash into a flat one
-        # if the hash is already flat it does nothing.
         user_info = JSON.parse(userinfo_response.body).flatten_data
       end
       user_info['login'] = user_info[oauth_provider.custom_uid_field]
@@ -226,18 +224,13 @@ class RedmineOauthController < AccountController
 
     # Roles
     non_default_roles = []
-    keys = oauth_provider.validate_user_roles&.split('.')
-    if keys&.size&.positive?
-      roles = user_info
-      while keys.size.positive?
-        key = keys.shift
-        unless roles.key?(key)
-          roles = []
-          break
-        end
-        roles = roles[key]
-      end
-      roles = roles.to_a
+    key = oauth_provider.validate_user_roles
+    if key.present?
+      roles = if (h = user_info.select { |k, _v| k =~ /^#{key}(\.(\d+))?$/ })
+                h.values
+              else
+                []
+              end
       @admin = roles.include?('admin')
       if roles.blank? || (roles.exclude?('user') && !@admin)
         Rails.logger.info 'Authentication failed due to a missing role in the token'
