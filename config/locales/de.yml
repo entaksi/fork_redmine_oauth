@@ -42,8 +42,7 @@ de:
     Benutzer, deren E-Mail-Adresse bei einer dieser Domains (oder einer Subdomain) liegt, werden automatisch aktiviert.
     Alle anderen neuen Benutzer werden unter Genehmigung des Administrators erstellt. Beispiel: example.com, partner.org
   oauth_hide_login_form: Login-Formular ausblenden
-  oauth_update_login: Login aktualizieren
-  oauth_update_login_info: Aktualizieren Login des Benutzers nach einer erfolgreichen Anmeldung.
+  oauth_update_login_info: Aktualizieren das Benutzerprofil nach einer erfolgreichen Anmeldung.
   oauth_logout: OAuth-Abmeldung
   oauth_logout_info: Abmelden auch vom OAuth-Anbieter nach der Redmine-Abmeldung.
   oauth_login: OAuth-Anmeldung

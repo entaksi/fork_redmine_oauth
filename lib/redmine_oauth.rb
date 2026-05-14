@@ -53,6 +53,21 @@ module RedmineOauth
       value.to_i.positive? || value == 'true'
     end
 
+    def update_email?
+      value = Setting.plugin_redmine_oauth['update_email']
+      value.to_i.positive? || value == 'true'
+    end
+
+    def update_firstname?
+      value = Setting.plugin_redmine_oauth['update_firstname']
+      value.to_i.positive? || value == 'true'
+    end
+
+    def update_lastname?
+      value = Setting.plugin_redmine_oauth['update_lastname']
+      value.to_i.positive? || value == 'true'
+    end
+
     def oauth_logout?
       value = Setting.plugin_redmine_oauth['oauth_logout']
       value.to_i.positive? || value == 'true'

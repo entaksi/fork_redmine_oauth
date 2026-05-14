@@ -48,8 +48,23 @@
   <em class="info"><%= l(:label_default)%>: <%= l(:general_text_No) %></em>
 </p>
 <p>
-  <label><%= l(:oauth_update_login) %></label>
-  <%= check_box_tag 'settings[update_login]', '1', RedmineOauth.update_login? %>
+  <label><%= l(:button_update) %></label>
+  <label class="inline">
+    <%= l(:field_login) %>
+    <%= check_box_tag 'settings[update_login]', '1', RedmineOauth.update_login? %>
+  </label>
+  <label class="inline">
+    <%= l(:field_mail) %>
+    <%= check_box_tag 'settings[update_email]', '1', RedmineOauth.update_email? %>
+  </label>
+  <label class="inline">
+    <%= l(:field_firstname) %>
+    <%= check_box_tag 'settings[update_firstname]', '1', RedmineOauth.update_firstname? %>
+  </label>
+  <label class="inline">
+    <%= l(:field_lastname) %>
+    <%= check_box_tag 'settings[update_lastname]', '1', RedmineOauth.update_lastname? %>
+  </label>
   <em class="info">
     <%= l(:oauth_update_login_info) %>
     <br>

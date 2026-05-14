@@ -27,6 +27,8 @@ class RedmineOauthControllerTest < RedmineOAuth::Test::IntegrationTest
     super
     @keylock_provider = OauthProvider.find(1)
     @invalid_provider = OauthProvider.find(2)
+    @jsmith = User.find_by(login: 'jsmith')
+    @oauth_provider = OauthProvider.find(1)
   end
 
   def test_oauth
@@ -43,5 +45,63 @@ class RedmineOauthControllerTest < RedmineOAuth::Test::IntegrationTest
   def test_oauth_callback_csrf
     get '/oauth2callback'
     assert_response :unprocessable_content
+  end
+
+  def test_update_user_login
+    with_settings plugin_redmine_oauth: { 'update_login' => '0' } do
+      RedmineOauthController.update_user @jsmith, 'login', 'email@example.com', 'firstname', 'lastname'
+      assert_equal 'jsmith', @jsmith.login
+    end
+    with_settings plugin_redmine_oauth: { 'update_login' => '1' } do
+      RedmineOauthController.update_user @jsmith, 'login', 'email@example.com', 'firstname', 'lastname'
+      assert_equal 'login', @jsmith.login
+    end
+  end
+
+  def test_update_user_email
+    with_settings plugin_redmine_oauth: { 'update_email' => '0' } do
+      RedmineOauthController.update_user @jsmith, 'login', 'email@example.com', 'firstname', 'lastname'
+      assert_equal 'jsmith@somenet.foo', @jsmith.mail
+    end
+    with_settings plugin_redmine_oauth: { 'update_email' => '1' } do
+      RedmineOauthController.update_user @jsmith, 'login', 'email@example.com', 'firstname', 'lastname'
+      assert_equal 'email@example.com', @jsmith.mail
+    end
+  end
+
+  def test_update_firstname
+    with_settings plugin_redmine_oauth: { 'update_firstname' => '0' } do
+      RedmineOauthController.update_user @jsmith, 'login', 'email@example.com', 'firstname', 'lastname'
+      assert_equal 'John', @jsmith.firstname
+    end
+    with_settings plugin_redmine_oauth: { 'update_firstname' => '1' } do
+      RedmineOauthController.update_user @jsmith, 'login', 'email@example.com', 'firstname', 'lastname'
+      assert_equal 'firstname', @jsmith.firstname
+    end
+  end
+
+  def test_update_lastname
+    with_settings plugin_redmine_oauth: { 'update_lastname' => '0' } do
+      RedmineOauthController.update_user @jsmith, 'login', 'email@example.com', 'firstname', 'lastname'
+      assert_equal 'Smith', @jsmith.lastname
+    end
+    with_settings plugin_redmine_oauth: { 'update_lastname' => '1' } do
+      RedmineOauthController.update_user @jsmith, 'login', 'email@example.com', 'firstname', 'lastname'
+      assert_equal 'lastname', @jsmith.lastname
+    end
+  end
+
+  def test_get_firstname
+    info = {
+      'name' => 'John Smith'
+    }
+    assert_equal 'John', RedmineOauthController.get_firstname(info, @oauth_provider)
+  end
+
+  def test_get_lastname
+    info = {
+      'name' => 'John Smith'
+    }
+    assert_equal 'Smith', RedmineOauthController.get_lastname(info, @oauth_provider)
   end
 end

@@ -43,8 +43,7 @@ ko:
     All other new users are created pending administrator approval. Example: example.com, partner.org
   oauth_custom_email_field_info: "이메일 필드(기본값: email)."
   oauth_hide_login_form: 로그인 폼 숨기기(접기)
-  oauth_update_login: 로그인 갱신
-  oauth_update_login_info: 성공적인 로그인 후 사용자의 로그인 이름을 갱신합니다.
+  oauth_update_login_info: 로그인이 성공한 후에는 사용자의 프로필을 갱신하세요.
   oauth_logout: OAuth 로그아웃
   oauth_logout_info: Redmine 로그아웃 후 OAuth 제공자에서도 로그아웃합니다.
   oauth_login: OAuth 로그인

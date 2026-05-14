@@ -264,8 +264,6 @@ class RedmineOauthController < AccountController
     cookies[:oauth_autologin] = cookie_options
   end
 
-  private
-
   def generate_code_verifier
     SecureRandom.urlsafe_base64 32
   end
@@ -288,6 +286,8 @@ class RedmineOauthController < AccountController
     login = info['login']
     login ||= info['unique_name']
     login ||= info['preferred_username']
+    firstname = RedmineOauthController.get_firstname(info, oauth_provider)
+    lastname = RedmineOauthController.get_lastname(info, oauth_provider)
     # Find the user
     user = case oauth_provider.identify_user_by
            when 'login'
@@ -301,10 +301,7 @@ class RedmineOauthController < AccountController
       elsif user.active? # Active
         handle_active_user user
         user.update_last_login_on!
-        if RedmineOauth.update_login?
-          user.login = login
-          Rails.logger.error(user.errors.full_messages.to_sentence) unless user.save
-        end
+        RedmineOauthController.update_user user, login, email, firstname, lastname
         # Disable 2FA initialization request
         session.delete(:must_activate_twofa)
         # Disable password change request
@@ -316,12 +313,8 @@ class RedmineOauthController < AccountController
       # Create on the fly
       user = User.new
       user.mail = email
-      user.firstname = info[oauth_provider.custom_firstname_field]
-      user.lastname = info[oauth_provider.custom_lastname_field]
-      first_name, last_name = info['name'].split if info['name'].present?
-      user.firstname ||= first_name
-      user.lastname ||= last_name
-      user.lastname ||= ''
+      user.firstname = firstname
+      user.lastname = lastname
       user.mail = email
       user.login = login
       user.random_password
@@ -372,5 +365,29 @@ class RedmineOauthController < AccountController
       render_error status: 422, message: l(:error_invalid_authenticity_token)
     end
     session.delete :oauth_csrf_token
+  end
+
+  # Update user's profile with data from OAuth provider
+  def self.update_user(user, login, email, firstname, lastname)
+    user.login = login if RedmineOauth.update_login?
+    user.mail = email if RedmineOauth.update_email?
+    user.firstname = firstname if RedmineOauth.update_firstname?
+    user.lastname = lastname if RedmineOauth.update_lastname?
+    Rails.logger.error(user.errors.full_messages.to_sentence) unless user.save
+  end
+
+  # Get the first name from for OAuth data
+  def self.get_firstname(info, oauth_provider)
+    firstname = info[oauth_provider.custom_firstname_field]
+    firstname, = info['name'].split if info['name'].present? && firstname.blank?
+    firstname
+  end
+
+  # Get the last name from for OAuth data
+  def self.get_lastname(info, oauth_provider)
+    lastname = info[oauth_provider.custom_lastname_field]
+    _, lastname = info['name'].split if info['name'].present? && lastname.blank?
+    lastname ||= ''
+    lastname
   end
 end
