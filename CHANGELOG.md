@@ -1,8 +1,18 @@
 Changelog for Redmine OAuth
 ==========================
 
-4.0.7 *????-??-??*
+4.0.7 *2026-05-20*
 ------------------
+
+    Update more user parameters
+    GitLab provider fixed
+    Increased length of site and client_id fields
+
+* New: #123 - Increase limit for site and client_id fields
+* Bug: #122 - Error during migration from 3.0.9 to 4.0.6 (ERROR: value too long for type character varying(60))
+* Bug: #125 - Errors when using GitLab as provider typebugSomething isn't working
+* Bug: #126 - DataFlattener causes issues when parsing user roles for Custom oauth provider
+* New: #127 - Request: option to update more user parameters on login
 
 4.0.6 *2026-04-08*
 ------------------
