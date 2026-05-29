@@ -1,8 +1,13 @@
 Changelog for Redmine OAuth
 ==========================
 
-4.0.8 *????-??-??*
+4.0.8 *2026-05-29*
 ------------------
+
+    Bugs fixing
+
+* Bug: #128 - Fix oauth_provider lookup in imap.rb
+* Bug: #98 - Cookie overflow
 
 4.0.7 *2026-05-20*
 ------------------
