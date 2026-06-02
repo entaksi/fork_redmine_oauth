@@ -2,8 +2,8 @@
 
 # Redmine plugin OAuth
 #
-# Widen client_id: Google and other providers use IDs longer than varchar(60).
-# Widen site as well to keep both URL-related fields consistent.
+# The input fields for "OAuth endpoint" and "Token endpoint" enforce a maximum length of 80 characters.
+# This is insufficient for real-world IdP endpoints.
 
 # OauthProviders DB migration
 class OauthProviderCustomEndpointsLength < ActiveRecord::Migration[7.2]
