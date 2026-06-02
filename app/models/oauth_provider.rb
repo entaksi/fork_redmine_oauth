@@ -25,9 +25,9 @@ class OauthProvider < ApplicationRecord
   validates :client_secret, presence: true, length: { maximum: 128 } # Must be longer due to an optional cyphering
   validates :tenant_id, length: { maximum: 40 }
   validates :custom_name, presence: true, uniqueness: true, length: { maximum: 30 }
-  validates :custom_auth_endpoint, length: { maximum: 80 }
+  validates :custom_auth_endpoint, length: { maximum: 256 }
   validates :custom_auth_endpoint, presence: true, if: proc { |p| p.custom_name == 'Custom' }
-  validates :custom_token_endpoint, length: { maximum: 80 }
+  validates :custom_token_endpoint, length: { maximum: 256 }
   validates :custom_token_endpoint, presence: true, if: proc { |p| p.custom_name == 'Custom' }
   validates :custom_profile_endpoint, length: { maximum: 80 }
   validates :custom_scope, length: { maximum: 40 }
