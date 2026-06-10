@@ -41,19 +41,6 @@ class RedmineOauthController < AccountController
     code_verifier = generate_code_verifier
     session[:code_verifier] = code_verifier
     code_challenge = generate_code_challenge(code_verifier)
-    # sudo mode
-    # oauth_sudo_mode_options = {
-    #       method: params[:_method],
-    #       authenticity_token: :auto,
-    #     }
-    # sudo_mode_params = params.except(:back_url, :_method, :oauth_provider, :controller, :action, :_action)
-    #                          .to_unsafe_hash # TODO: Do we need to call unsafe?
-    # unless sudo_mode_params.empty?
-    #   sudo_mode_params[:action] = params[:_action]
-    #   session[:oauth_sudo_mode_params] = sudo_mode_params
-    #   session[:oauth_sudo_mode_options] = oauth_sudo_mode_options
-    # end
-
     # OAuth provider
     oauth_provider = OauthProvider.find(params[:oauth_provider])
 
@@ -70,7 +57,8 @@ class RedmineOauthController < AccountController
                  'user:email'
                end,
         code_challenge: code_challenge,
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        max_age: params[:reauth] ? 0 : nil
       )
     when 'GitHub'
       redirect_to RedmineOauth::OauthClient.client(oauth_provider).auth_code.authorize_url(
@@ -78,7 +66,8 @@ class RedmineOauthController < AccountController
         state: oauth_csrf_token,
         scope: 'user:email',
         code_challenge: code_challenge,
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        max_age: params[:reauth] ? 0 : nil
       )
     when 'GitLab'
       url = RedmineOauth::OauthClient.client(oauth_provider).auth_code.authorize_url(
@@ -86,7 +75,8 @@ class RedmineOauthController < AccountController
         state: oauth_csrf_token,
         scope: 'read_user',
         code_challenge: code_challenge,
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        max_age: params[:reauth] ? 0 : nil
       )
       url << "&#{oauth_provider.url_parameters}" if oauth_provider.url_parameters.present?
       redirect_to url
@@ -96,7 +86,8 @@ class RedmineOauthController < AccountController
         state: oauth_csrf_token,
         scope: 'profile email',
         code_challenge: code_challenge,
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        max_age: params[:reauth] ? 0 : nil
       )
       url << "&#{oauth_provider.url_parameters}" if oauth_provider.url_parameters.present?
       redirect_to url
@@ -106,7 +97,8 @@ class RedmineOauthController < AccountController
         state: oauth_csrf_token,
         scope: 'openid email',
         code_challenge: code_challenge,
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        max_age: params[:reauth] ? 0 : nil
       )
     when 'Okta'
       redirect_to RedmineOauth::OauthClient.client(oauth_provider).auth_code.authorize_url(
@@ -114,7 +106,8 @@ class RedmineOauthController < AccountController
         state: oauth_csrf_token,
         scope: 'openid profile email',
         code_challenge: code_challenge,
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        max_age: params[:reauth] ? 0 : nil
       )
     when 'Custom'
       redirect_to RedmineOauth::OauthClient.client(oauth_provider).auth_code.authorize_url(
@@ -122,7 +115,8 @@ class RedmineOauthController < AccountController
         state: oauth_csrf_token,
         scope: oauth_provider.custom_scope,
         code_challenge: code_challenge,
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        max_age: params[:reauth] ? 0 : nil
       )
     else
       flash['error'] = l(:oauth_invalid_provider)
@@ -139,6 +133,13 @@ class RedmineOauthController < AccountController
     if params['error'].present?
       Rails.logger.error params['error_description']
       raise StandardError, l(:notice_account_invalid_credentials)
+    end
+
+    if session.has_key?(:oauth_sudo_mode) && User.current.logged?
+      oauth_sudo_mode = session.delete(:oauth_sudo_mode)
+      oauth_sudo_mode[:params][:oauth_sudo_mode_ok] = '1'
+      repost oauth_sudo_mode[:back_url], params: oauth_sudo_mode[:params], options: oauth_sudo_mode[:options]
+      return
     end
 
     # Retrieve the PKCE code_verifier from the session
@@ -255,21 +256,8 @@ class RedmineOauthController < AccountController
 
     # Try to log in
     set_params
-    oauth_sudo_mode = session.delete(:oauth_sudo_mode)
-
-    if oauth_sudo_mode.present?
-      if try_to_sudo(email, user_info, oauth_provider)
-        #Redmine::SudoMode.active!
-        #Redmine::SudoMode.active?
-        oauth_sudo_mode[:params][:oauth_sudo_mode_ok] = 1
-        repost(oauth_sudo_mode[:back_url], params: oauth_sudo_mode[:params], options: oauth_sudo_mode[:options])
-      else
-        flash[:error] = l(:notice_account_invalid_credentials)
-      end
-    else
-      try_to_login email, user_info, non_default_roles, oauth_provider
-      session[:oauth_login] = oauth_provider.id
-    end
+    try_to_login email, user_info, non_default_roles, oauth_provider
+    session[:oauth_login] = oauth_provider.id
   rescue StandardError => e
     Rails.logger.error e.message
     flash['error'] = e.message

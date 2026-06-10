@@ -21,22 +21,21 @@ module RedmineOauth
   module Patches
     # AccountController patch
     module SudoModeControllerPatch
-      ################################################################################################################
-      # Overridden methods
 
-      # handle sudo password form submit
-      def process_sudo_form
-        if params[:oauth_sudo_mode_ok].present?
-          Redmine::SudoMode.active!
-          #else
-          #flash.now[:error] = l(:notice_account_wrong_password)
-        end
-      end
+      def require_sudo_mode(*param_names)
+        return true if Redmine::SudoMode.active?
 
-      # display the sudo password form
-      def render_sudo_form(param_names)
         @oauth_provider = OauthProvider.find_by(id: session[:oauth_login])
         return super unless @oauth_provider
+
+        if params[:oauth_sudo_mode_ok] == '1'
+          logger.info "Activating sudo mode for user #{User.current.login}"
+          Redmine::SudoMode.active!
+        end
+
+        # Note: This method must be called even right after `Redmine::SudoMode.active!`
+        # because despite its name, it has side effects!
+        return true if Redmine::SudoMode.active?
 
         if param_names.blank?
           # This list was copied from the original `require_sudo_mode`, but without `_method`.
@@ -54,17 +53,25 @@ module RedmineOauth
           }
         }
 
+        oauth_provider = OauthProvider.find_by(id: session[:oauth_login])
+        return super unless oauth_provider
+
+        logger.info "Reauthenticating #{User.current.login} for sudo mode"
+        redirect_to oauth_path(back_url: back_url, oauth_provider: oauth_provider.id, reauth: true)
+
+        false
+
         # @sudo_form ||= SudoMode::Form.new
         # @sudo_form.original_fields = params.slice(*param_names)
         #original_fields = params.slice(*param_names)
         #original_fields[:_action] = params[:action]
         # a simple 'render "oauth_sudo_mode/new"' works when used directly inside an
         # action, but not when called from a before_action:
-        no_store
-        respond_to do |format|
-          format.html { render 'oauth_sudo_mode/new' }
-          format.js   { render 'oauth_sudo_mode/new' }
-        end
+        # no_store
+        # respond_to do |format|
+        #   format.html { render 'oauth_sudo_mode/new' }
+        #   format.js   { render 'oauth_sudo_mode/new' }
+        # end
       end
 
       # def require_sudo_mode(*param_names)
