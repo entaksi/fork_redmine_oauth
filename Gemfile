@@ -21,3 +21,4 @@ source 'https://rubygems.org'
 
 gem 'jwt'
 gem 'oauth2'
+gem 'repost'

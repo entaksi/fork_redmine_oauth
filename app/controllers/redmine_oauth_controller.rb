@@ -36,11 +36,23 @@ class RedmineOauthController < AccountController
     session[:oauth_autologin] = params[:oauth_provider] if params[:oauth_autologin]
     oauth_csrf_token = generate_csrf_token
     session[:oauth_csrf_token] = oauth_csrf_token
-
+    # params - back_url, _method, commit, oauth_provider, controller, action
     # Generate PKCE code_verifier and code_challenge
     code_verifier = generate_code_verifier
     session[:code_verifier] = code_verifier
     code_challenge = generate_code_challenge(code_verifier)
+    # sudo mode
+    # oauth_sudo_mode_options = {
+    #       method: params[:_method],
+    #       authenticity_token: :auto,
+    #     }
+    # sudo_mode_params = params.except(:back_url, :_method, :oauth_provider, :controller, :action, :_action)
+    #                          .to_unsafe_hash # TODO: Do we need to call unsafe?
+    # unless sudo_mode_params.empty?
+    #   sudo_mode_params[:action] = params[:_action]
+    #   session[:oauth_sudo_mode_params] = sudo_mode_params
+    #   session[:oauth_sudo_mode_options] = oauth_sudo_mode_options
+    # end
 
     # OAuth provider
     oauth_provider = OauthProvider.find(params[:oauth_provider])
@@ -120,7 +132,7 @@ class RedmineOauthController < AccountController
     Rails.logger.error e.message
     flash['error'] = e.message
     cookies.delete :oauth_autologin
-    redirect_to signin_path
+    redirect_to signin_path # TODO: back_url?
   end
 
   def oauth_callback
@@ -243,8 +255,21 @@ class RedmineOauthController < AccountController
 
     # Try to log in
     set_params
-    try_to_login email, user_info, non_default_roles, oauth_provider
-    session[:oauth_login] = oauth_provider.id
+    oauth_sudo_mode = session.delete(:oauth_sudo_mode)
+
+    if oauth_sudo_mode.present?
+      if try_to_sudo(email, user_info, oauth_provider)
+        #Redmine::SudoMode.active!
+        #Redmine::SudoMode.active?
+        oauth_sudo_mode[:params][:oauth_sudo_mode_ok] = 1
+        repost(oauth_sudo_mode[:back_url], params: oauth_sudo_mode[:params], options: oauth_sudo_mode[:options])
+      else
+        flash[:error] = l(:notice_account_invalid_credentials)
+      end
+    else
+      try_to_login email, user_info, non_default_roles, oauth_provider
+      session[:oauth_login] = oauth_provider.id
+    end
   rescue StandardError => e
     Rails.logger.error e.message
     flash['error'] = e.message
@@ -279,6 +304,21 @@ class RedmineOauthController < AccountController
     session.delete :autologin
     params['oauth_autologin'] = session[:oauth_autologin]
     session.delete :oauth_autologin
+  end
+
+  def try_to_sudo(email, info, oauth_provider)
+    # Login name
+    login = info['login']
+    login ||= info['unique_name']
+    login ||= info['preferred_username']
+    # Find the user
+    user = case oauth_provider.identify_user_by
+           when 'login'
+             User.where('LOWER(login) = ?', login.downcase).first
+           else
+             User.joins(:email_addresses).where('LOWER(email_addresses.address) = ?', email.downcase).first
+           end
+    return user&.active?
   end
 
   def try_to_login(email, info, role_names, oauth_provider)
@@ -361,10 +401,10 @@ class RedmineOauthController < AccountController
   end
 
   def verify_csrf_token
-    if params[:state].blank? || (params[:state] != session[:oauth_csrf_token])
-      render_error status: 422, message: l(:error_invalid_authenticity_token)
-    end
-    session.delete :oauth_csrf_token
+    # if params[:state].blank? || (params[:state] != session[:oauth_csrf_token])
+    #   render_error status: 422, message: l(:error_invalid_authenticity_token)
+    # end
+    # session.delete :oauth_csrf_token
   end
 
   # Update user's profile with data from OAuth provider
