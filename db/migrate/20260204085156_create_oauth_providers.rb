@@ -27,9 +27,9 @@ class CreateOauthProviders < ActiveRecord::Migration[7.2]
       t.string :client_secret, null: false, limit: 128
       t.string :tenant_id, null: false, limit: 40
       t.string :custom_name, null: false, limit: 30
-      t.string :custom_auth_endpoint, null: true, limit: 80
-      t.string :custom_token_endpoint, null: true, limit: 80
-      t.string :custom_profile_endpoint, null: true, limit: 80
+      t.string :custom_auth_endpoint, null: true, limit: 256
+      t.string :custom_token_endpoint, null: true, limit: 256
+      t.string :custom_profile_endpoint, null: true, limit: 256
       t.string :custom_scope, null: true, default: 'openid profile email', limit: 40
       t.string :custom_uid_field, null: true, default: 'preferred_username', limit: 40
       t.string :custom_email_field, null: true, default: 'email', limit: 40
