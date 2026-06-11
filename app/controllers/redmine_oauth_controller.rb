@@ -36,12 +36,11 @@ class RedmineOauthController < AccountController
     session[:oauth_autologin] = params[:oauth_provider] if params[:oauth_autologin]
     oauth_csrf_token = generate_csrf_token
     session[:oauth_csrf_token] = oauth_csrf_token
-
+    # params - back_url, _method, commit, oauth_provider, controller, action
     # Generate PKCE code_verifier and code_challenge
     code_verifier = generate_code_verifier
     session[:code_verifier] = code_verifier
     code_challenge = generate_code_challenge(code_verifier)
-
     # OAuth provider
     oauth_provider = OauthProvider.find(params[:oauth_provider])
 
@@ -58,7 +57,8 @@ class RedmineOauthController < AccountController
                  'user:email'
                end,
         code_challenge: code_challenge,
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        max_age: params[:reauth] ? 0 : nil
       )
     when 'GitHub'
       redirect_to RedmineOauth::OauthClient.client(oauth_provider).auth_code.authorize_url(
@@ -66,7 +66,8 @@ class RedmineOauthController < AccountController
         state: oauth_csrf_token,
         scope: 'user:email',
         code_challenge: code_challenge,
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        max_age: params[:reauth] ? 0 : nil
       )
     when 'GitLab'
       url = RedmineOauth::OauthClient.client(oauth_provider).auth_code.authorize_url(
@@ -74,7 +75,8 @@ class RedmineOauthController < AccountController
         state: oauth_csrf_token,
         scope: 'read_user',
         code_challenge: code_challenge,
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        max_age: params[:reauth] ? 0 : nil
       )
       url << "&#{oauth_provider.url_parameters}" if oauth_provider.url_parameters.present?
       redirect_to url
@@ -84,7 +86,8 @@ class RedmineOauthController < AccountController
         state: oauth_csrf_token,
         scope: 'profile email',
         code_challenge: code_challenge,
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        max_age: params[:reauth] ? 0 : nil
       )
       url << "&#{oauth_provider.url_parameters}" if oauth_provider.url_parameters.present?
       redirect_to url
@@ -94,7 +97,8 @@ class RedmineOauthController < AccountController
         state: oauth_csrf_token,
         scope: 'openid email',
         code_challenge: code_challenge,
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        max_age: params[:reauth] ? 0 : nil
       )
     when 'Okta'
       redirect_to RedmineOauth::OauthClient.client(oauth_provider).auth_code.authorize_url(
@@ -102,7 +106,8 @@ class RedmineOauthController < AccountController
         state: oauth_csrf_token,
         scope: 'openid profile email',
         code_challenge: code_challenge,
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        max_age: params[:reauth] ? 0 : nil
       )
     when 'Custom'
       redirect_to RedmineOauth::OauthClient.client(oauth_provider).auth_code.authorize_url(
@@ -110,7 +115,8 @@ class RedmineOauthController < AccountController
         state: oauth_csrf_token,
         scope: oauth_provider.custom_scope,
         code_challenge: code_challenge,
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        max_age: params[:reauth] ? 0 : nil
       )
     else
       flash['error'] = l(:oauth_invalid_provider)
@@ -127,6 +133,13 @@ class RedmineOauthController < AccountController
     if params['error'].present?
       Rails.logger.error params['error_description']
       raise StandardError, l(:notice_account_invalid_credentials)
+    end
+
+    if session.key?(:oauth_sudo_mode) && User.current.logged?
+      oauth_sudo_mode = session.delete(:oauth_sudo_mode)
+      session[:oauth_sudo_mode_ok] = true
+      repost oauth_sudo_mode[:back_url], params: oauth_sudo_mode[:params], options: oauth_sudo_mode[:options]
+      return
     end
 
     # Retrieve the PKCE code_verifier from the session
@@ -364,7 +377,7 @@ class RedmineOauthController < AccountController
     if params[:state].blank? || (params[:state] != session[:oauth_csrf_token])
       render_error status: 422, message: l(:error_invalid_authenticity_token)
     end
-    session.delete :oauth_csrf_token
+    session.delete(:oauth_csrf_token) unless session.key?(:oauth_sudo_mode)
   end
 
   # Update user's profile with data from OAuth provider
