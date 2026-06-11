@@ -126,7 +126,7 @@ class RedmineOauthController < AccountController
     Rails.logger.error e.message
     flash['error'] = e.message
     cookies.delete :oauth_autologin
-    redirect_to signin_path # TODO: back_url?
+    redirect_to signin_path
   end
 
   def oauth_callback
@@ -135,9 +135,9 @@ class RedmineOauthController < AccountController
       raise StandardError, l(:notice_account_invalid_credentials)
     end
 
-    if session.has_key?(:oauth_sudo_mode) && User.current.logged?
+    if session.key?(:oauth_sudo_mode) && User.current.logged?
       oauth_sudo_mode = session.delete(:oauth_sudo_mode)
-      oauth_sudo_mode[:params][:oauth_sudo_mode_ok] = '1'
+      session[:oauth_sudo_mode_ok] = true
       repost oauth_sudo_mode[:back_url], params: oauth_sudo_mode[:params], options: oauth_sudo_mode[:options]
       return
     end
@@ -294,21 +294,6 @@ class RedmineOauthController < AccountController
     session.delete :oauth_autologin
   end
 
-  def try_to_sudo(email, info, oauth_provider)
-    # Login name
-    login = info['login']
-    login ||= info['unique_name']
-    login ||= info['preferred_username']
-    # Find the user
-    user = case oauth_provider.identify_user_by
-           when 'login'
-             User.where('LOWER(login) = ?', login.downcase).first
-           else
-             User.joins(:email_addresses).where('LOWER(email_addresses.address) = ?', email.downcase).first
-           end
-    return user&.active?
-  end
-
   def try_to_login(email, info, role_names, oauth_provider)
     # Login name
     login = info['login']
@@ -389,10 +374,10 @@ class RedmineOauthController < AccountController
   end
 
   def verify_csrf_token
-    # if params[:state].blank? || (params[:state] != session[:oauth_csrf_token])
-    #   render_error status: 422, message: l(:error_invalid_authenticity_token)
-    # end
-    # session.delete :oauth_csrf_token
+    if params[:state].blank? || (params[:state] != session[:oauth_csrf_token])
+      render_error status: 422, message: l(:error_invalid_authenticity_token)
+    end
+    session.delete(:oauth_csrf_token) unless session.key?(:oauth_sudo_mode)
   end
 
   # Update user's profile with data from OAuth provider

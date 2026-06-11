@@ -21,27 +21,17 @@ module RedmineOauth
   module Patches
     # AccountController patch
     module SudoModeControllerPatch
-
       def require_sudo_mode(*param_names)
         return true if Redmine::SudoMode.active?
 
-        @oauth_provider = OauthProvider.find_by(id: session[:oauth_login])
-        return super unless @oauth_provider
-
-        if params[:oauth_sudo_mode_ok] == '1'
-          logger.info "Activating sudo mode for user #{User.current.login}"
+        if session.delete(:oauth_sudo_mode_ok)
+          Rails.logger.info "Activating sudo mode for #{User.current.login}"
           Redmine::SudoMode.active!
         end
 
-        # Note: This method must be called even right after `Redmine::SudoMode.active!`
-        # because despite its name, it has side effects!
         return true if Redmine::SudoMode.active?
 
-        if param_names.blank?
-          # This list was copied from the original `require_sudo_mode`, but without `_method`.
-          param_names = params.keys - %w(id action controller authenticity_token utf8)
-        end
-
+        param_names = params.keys - %w[id action controller authenticity_token utf8] if param_names.blank?
         back_url = url_for(**params.slice(:controller, :action, :id, :project_id).to_unsafe_hash)
 
         session[:oauth_sudo_mode] = {
@@ -49,70 +39,16 @@ module RedmineOauth
           params: params.slice(*param_names, '_method').to_unsafe_hash,
           options: {
             method: request.method_symbol,
-            authenticity_token: :auto,
+            authenticity_token: :auto
           }
         }
 
-        oauth_provider = OauthProvider.find_by(id: session[:oauth_login])
-        return super unless oauth_provider
+        oauth_provider_id = OauthProvider.where(id: session[:oauth_login]).pick(:id)
+        return super unless oauth_provider_id
 
-        logger.info "Reauthenticating #{User.current.login} for sudo mode"
-        redirect_to oauth_path(back_url: back_url, oauth_provider: oauth_provider.id, reauth: true)
-
-        false
-
-        # @sudo_form ||= SudoMode::Form.new
-        # @sudo_form.original_fields = params.slice(*param_names)
-        #original_fields = params.slice(*param_names)
-        #original_fields[:_action] = params[:action]
-        # a simple 'render "oauth_sudo_mode/new"' works when used directly inside an
-        # action, but not when called from a before_action:
-        # no_store
-        # respond_to do |format|
-        #   format.html { render 'oauth_sudo_mode/new' }
-        #   format.js   { render 'oauth_sudo_mode/new' }
-        # end
+        Rails.logger.info "Reauthenticating #{User.current.login} for sudo mode"
+        redirect_to oauth_path(back_url: back_url, oauth_provider: oauth_provider_id, reauth: true)
       end
-
-      # def require_sudo_mode(*param_names)
-      #   # return super unless RedmineOidc.settings.enabled
-      #   # return super unless RedmineOidc.settings.sudo_mode_reauthenticate
-      #
-      #   return true if Redmine::SudoMode.active?
-      #
-      #   # if OidcSession.spawn(session).auth_time > Redmine::SudoMode.timeout.ago.to_i
-      #   #   logger.info "Activating sudo mode for user #{User.current.login}"
-      #   #   Redmine::SudoMode.active!
-      #   # end
-      #
-      #   # Note: This method must be called even right after `Redmine::SudoMode.active!`
-      #   # because despite its name, it has side effects!
-      #   #return true if Redmine::SudoMode.active?
-      #
-      #   oauth_provider = OauthProvider.find_by(id: session[:oauth_login])
-      #   return super unless oauth_provider
-      #
-      #   if param_names.blank?
-      #     # This list was copied from the original `require_sudo_mode`, but without `_method`.
-      #     param_names = params.keys - %w(id action controller authenticity_token utf8)
-      #   end
-      #
-      #   back_url = url_for(**params.slice(:controller, :action, :id, :project_id).to_unsafe_hash)
-      #
-      #   session[:oauth_sudo_mode] = {
-      #     back_url: back_url,
-      #     params: params.slice(*param_names).to_unsafe_hash,
-      #     options: {
-      #       method: request.method_symbol,
-      #       authenticity_token: :auto,
-      #     }
-      #   }
-      #
-      #   #logger.info "Reauthenticating #{User.current.login} for sudo mode"
-      #   redirect_to oauth_path(back_url: back_url, oauth_provider: oauth_provider.id, reauth: true)
-      #
-      #   false
-      # end
     end
   end
 end
