@@ -1,8 +1,14 @@
 Changelog for Redmine OAuth
 ==========================
 
-4.0.9 *????-??-??*
+4.0.9 *2026-06-23*
 ------------------
+
+    Sudo mode
+
+* New: #131 - Migration fails with Data too long for column 'custom_auth_endpoint' when migrating existing settings
+* New: #130 - Custom provider: OAuth/Token endpoint fields limited to 80 characters
+* New: #95 - OAuth users cannot confirm password for sensitive actions (Administration, settings, etc.)
 
 4.0.8 *2026-05-29*
 ------------------
